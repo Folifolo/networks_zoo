@@ -6,20 +6,19 @@ import pickle as pkl
 from keras.models import load_model
 import os
 from annotation.ann_generator import (
-    get_enhansed_generator
+    get_mulimask_generator
 )
 from utils import open_pickle
 from sklearn.model_selection import train_test_split
 from annotation.model import unet
 from annotation.one_lead_one_mask import unet_simple
 from utils import save_history
-from annotation.trained_model_testing import test_model
 from annotation.dice_koef import (
     dice_coef, dice_coef_loss
 )
-
 dataset_path = "./DSET_argentina.pkl"
 segment_len=512
+
 
 def split_dict_annotations(dict_dataset):
     # бьем датасет-мапу на трейновую и тестовую
@@ -35,15 +34,16 @@ def get_generators(train_batch, test_batch):
     :param test_batch: размер батча для тестового генератора
     :return:
     """
-    dataset_in = open_pickle('./DSET_argentina.pkl')
+    dataset_in = open_pickle(dataset_path)
     train_dset, test_dset = split_dict_annotations(dataset_in)
-    my_generator_train = get_enhansed_generator(segment_len, batch_size=train_batch, dataset_in=train_dset)
-    my_generator_test = get_enhansed_generator(segment_len, batch_size=test_batch, dataset_in=test_dset)
+    my_generator_train = get_mulimask_generator(segment_len, batch_size=train_batch, dataset_in=train_dset)
+    my_generator_test = get_mulimask_generator(segment_len, batch_size=test_batch, dataset_in=test_dset)
     return my_generator_train, my_generator_test
 
 def get_model():
     #return unet(seg_len=segment_len)
-    return unet_simple(seg_len=segment_len)
+    return unet_simple33(seg_len=segment_len)
+
 
 def train(name):
     model = get_model()
@@ -55,8 +55,7 @@ def train(name):
                                   validation_steps=1)
 
     save_history(history, name)
-    model.save(name + '.h5') 
-
+    model.save(name + '.h5')
 
 def eval_models_in_folder(num_pictures):
     """
@@ -72,20 +71,54 @@ def eval_models_in_folder(num_pictures):
         filename = os.fsdecode(file)
         if filename.endswith(".h5"):
             model = load_model(os.path.join(folder,filename),custom_objects={'dice_coef_loss': dice_coef_loss, 'dice_coef':dice_coef})
-            test_model(model, batch, name="VIS_"+filename[0:-len(".h5")])
+            test_model_multimask(model, batch, name="VIS_"+filename[0:-len(".h5")])
 
+
+def test_model_multimask(model, batch, name):
+    """
+
+    :param model: бученная модель
+    :param batch: батч из тестовго генератора, (x, ann)
+    :param name: имя для серии картинок
+    :return:
+    """
+    x = batch[0]
+    ann = batch[1]
+    print("модель предсказывает на х с формой " + str(x.shape))
+    predictions = model.predict_on_batch(x)
+    print("предсказания (ann) имеют форму " + str(predictions.shape))
+    for i in range(len(predictions)):
+        predicted = predictions[i]
+        true_ans = ann[i]
+        signal_in_channel = x[i]
+
+        # для удобства рисования свопаем оси
+        predicted = np.swapaxes(predicted, 0, 1)
+        true_ans = np.swapaxes(true_ans, 0, 1)
+        plot_name = "VIS" + name + "_" + str(i) + ".png"
+
+        f, (ax1, ax2) = plt.subplots(1, 2, sharey=False, sharex=False)
+        x = range(0, len(signal_in_channel))
+
+        ax1.plot(predicted[0], 'r-', label="сырой отв.0")
+        ax1.plot(predicted[1], 'y-', label="сырой отв.1")
+        ax1.plot(predicted[2], 'b-', label="сырой отв.2")
+
+        ax2.plot(predicted, 'm-', label="ЭКГ")
+        ax2.fill_between(x, 0, 10, alpha=0.5, where=true_ans[0] > 0.6, label="правильн.отв.", facecolor='red')
+        ax2.fill_between(x, 0, 10, alpha=0.5, where=true_ans[1] > 0.6, label="правильн.отв.", facecolor='yellow')
+        ax2.fill_between(x, 0, 10, alpha=0.5, where=true_ans[2] > 0.6, label="правильн.отв.", facecolor='blue')
+
+        plt.legend(loc=2)
+        plt.savefig(plot_name)
+
+    print("картинки сохранены!")
 
 if __name__ == "__main__":
-    name = "afina_annotator"
+    name = "maria_annotator"
 
     train(name)
     eval_models_in_folder(40)
-
-
-
-
-
-
 
 
 
