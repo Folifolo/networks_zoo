@@ -1,11 +1,10 @@
 # -*- coding: utf-8 -*
 #from sklearn.model_selection import train_test_split, learning_curve, KFold
-from sklearn.model_selection import train_test_split
-from pprint import pprint
-
-import numpy as np
-import easygui
 import pickle as pkl
+
+import easygui
+import numpy as np
+from sklearn.model_selection import train_test_split
 
 def get_dataset_no_partitioning():
     # без разбивки на трейн-тест
@@ -17,8 +16,8 @@ def get_dataset_no_partitioning():
     infile.close()
 
     #assert len(new_dict['x']) == len(new_dict['y'])
-    if 'y' in new_dict:
-        x, y = np.array(new_dict['x']), np.array(new_dict['y'])
+    if 'ann' in new_dict:
+        x, y = np.array(new_dict['x']), np.array(new_dict['ann'])
         print(len(new_dict['x']), " записей ")
         return x, y
     else:
@@ -53,4 +52,4 @@ def prepare_data(seg_len=None):
     return x_train, x_test, y_train, y_test
 
 if __name__ == "__main__":
-    x_train, x_test, y_train, y_test = prepare_data(seg_len=252)
+    x_train, x_test, y_train, y_test = prepare_data(seg_len=None)
